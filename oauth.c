@@ -347,7 +347,7 @@ char *oauth_url_unescape(const char *string, size_t *olen)
  */
 char *oauth_sign_plaintext(const char *m, const char *k)
 {
-	return strdup(k);
+	return xstrdup(k);
 }
 
 /**
