@@ -62,7 +62,7 @@ char *oauth_http_get(const char *u, const char *q)
 	char *result = NULL;
 	HTTPResponse *response = NULL;
 	response = socket_http_get(u, q, NULL, NOT_KEEPALIVE);
-	if( response ) {
+	if (response != NULL) {
 		result = (char *)response->data;
 		free(response->header);
 		free(response);
@@ -86,7 +86,7 @@ char *oauth_http_get2(const char *u, const char *q, const char *customheader)
 	char *result = NULL;
 	HTTPResponse *response = NULL;
 	response = socket_http_get(u, q, customheader, NOT_KEEPALIVE);
-	if( response ) {
+	if (response != NULL) {
 		result = (char *)response->data;
 		free(response->header);
 		free(response);
@@ -111,7 +111,7 @@ char *oauth_http_post(const char *u, const char *p)
 	char *result = NULL;
 	HTTPResponse *response = NULL;
 	response = socket_http_post(u, p, strlen(p), NULL, NOT_KEEPALIVE);
-	if( response ) {
+	if (response != NULL) {
 		result = (char *)response->data;
 		free(response->header);
 		free(response);
@@ -137,7 +137,7 @@ char *oauth_http_post2(const char *u, const char *p, const char *customheader)
 	char *result = NULL;
 	HTTPResponse *response = NULL;
 	response = socket_http_post(u, p, strlen(p), customheader, KEEPALIVE);
-	if( response ) {
+	if (response != NULL) {
 		result = (char *)response->data;
 		free(response->header);
 		free(response);
@@ -162,7 +162,7 @@ char *oauth_post_file(const char *u, const char *fn, const size_t len, const cha
 	char *result = NULL;
 	HTTPResponse *response = NULL;
 	response = socket_http_post_file(u, fn, len, customheader, KEEPALIVE);
-	if( response ) {
+	if (response != NULL) {
 		result = (char *)response->data;
 		free(response->header);
 		free(response);

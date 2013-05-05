@@ -31,7 +31,10 @@
 static __inline
 void *xmalloc_fatal(size_t size)
 {
-	if( size == 0 ) return NULL;
+	if (size == 0) {
+		return NULL;
+	}
+
 #ifndef PSP
 	fprintf(stderr, "Out of memory.");
 #endif
@@ -41,33 +44,41 @@ void *xmalloc_fatal(size_t size)
 void *xmalloc(size_t size)
 {
 	void *ptr = malloc(size);
-	if( ptr == NULL ) {
+
+	if (ptr == NULL) {
 		return xmalloc_fatal(size);
 	}
+
 	return ptr;
 }
 
 void *xcalloc(size_t nmemb, size_t size)
 {
 	void *ptr = calloc(nmemb, size);
-	if( ptr == NULL ) {
+
+	if (ptr == NULL) {
 		return xmalloc_fatal(nmemb * size);
 	}
+
 	return ptr;
 }
 
 void *xrealloc(void *ptr, size_t size)
 {
 	void *p = realloc(ptr, size);
-	if( p == NULL ) {
+
+	if (p == NULL) {
 		return xmalloc_fatal(size);
 	}
+
 	return p;
 }
 
 char *xstrdup(const char *s)
 {
 	void *ptr = xmalloc(strlen(s) + sizeof(char));
+
 	strcpy(ptr, s);
+
 	return (char *)ptr;
 }

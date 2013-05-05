@@ -7,6 +7,7 @@
 		#define WIN32_LEAN_AND_MEAN
 	#endif
 	#include <winsock2.h>
+	#include <ws2tcpip.h>
 #else
 	#if PSP
 		#include <pspuser.h>
@@ -95,9 +96,9 @@ void socket_release(void)
 	}
 }
 
-socket_t socket_open(int af, int type, int protocol)
+socket_t socket_open(int af, int type)
 {
-	return socket(af, type, protocol);
+	return socket(af, type, 0);
 }
 
 int socket_close(socket_t sock)
@@ -113,16 +114,18 @@ int socket_safeclose(socket_t sock)
 
 	shutdown(sock, SD_SEND);
 
-	while( 1 ) {
-		n = recv(sock, tmp, sizeof tmp, 0);
-		if( n <= 0 )
+	while (1) {
+		n = recv(sock, tmp, sizeof(tmp), 0);
+		if (n <= 0) {
 			break;
+		}
 	}
 
 	shutdown(sock, SD_BOTH);
 	return closesocket(sock);
 }
 
+// IPv4
 socket_t socket_connect(socket_t sock, const char *hostname, int port)
 {
 	struct hostent *host = NULL;
@@ -132,13 +135,13 @@ socket_t socket_connect(socket_t sock, const char *hostname, int port)
 	saddr.sin_family = AF_INET;
 	saddr.sin_port = htons((unsigned short)port);
 
-	if( (host = gethostbyname(hostname)) ) {
+	if ((host = gethostbyname(hostname))) {
 		saddr.sin_addr.s_addr = *((unsigned long *)host->h_addr_list[0]);
 	} else {
 		saddr.sin_addr.s_addr = inet_addr(hostname);
 	}
 
-	if( connect(sock, (struct sockaddr *)&saddr, sizeof(struct sockaddr_in)) >= 0 ) {
+	if (connect(sock, (struct sockaddr *)&saddr, sizeof(struct sockaddr_in)) >= 0) {
 		return sock;
 	}
 
@@ -166,7 +169,8 @@ size_t socket_read(socket_t sock, void *buffer, size_t size)
 		if (nrecv < 0) {
 			// error.
 			return nrecv;
-		} else if (nrecv == 0) {
+		}
+		else if (nrecv == 0) {
 			// disconnect.
 			break;
 		}
@@ -188,22 +192,20 @@ void *socket_read_alloc(socket_t sock, size_t *readsize)
 	int res = 0;
 	size_t sumsize = 0;
 
-	for(;;)
-	{
+	for(;;) {
 		allocsize += addsize;
 		buffer = (unsigned char *)xrealloc(buffer, allocsize);
 		pos = buffer + sumsize;
 		recvsize = addsize - sizeof(unsigned char);
 
-		while( recvsize > 0 )
-		{
+		while (recvsize > 0) {
 			res = recv(sock, pos, recvsize, 0);
-			if( res < 0 ) {
+			if (res < 0) {
 				free(buffer);
 				*readsize = 0;
 				return NULL;
 			}
-			else if( res == 0 ) {
+			else if (res == 0) {
 				*readsize = sumsize;
 				return (void *)buffer;
 			}
@@ -213,6 +215,7 @@ void *socket_read_alloc(socket_t sock, size_t *readsize)
 			sumsize += res;
 		}
 	}
+
 	return NULL;
 }
 
@@ -221,13 +224,13 @@ size_t socket_write(socket_t sock, const void *data, size_t size)
 	const char *pos = (const char *)data;
 	int nsend;
 
-	while (size > 0)
-	{
+	while (size > 0) {
 		nsend = send(sock, pos, size, 0);
 		if (nsend < 0) {
 			// error.
 			return nsend;
-		} else if (nsend == 0) {
+		}
+		else if (nsend == 0) {
 			break;
 		}
 
@@ -251,10 +254,11 @@ size_t socket_write_file(socket_t sock, const char *filename, size_t filesize)
 	FILE *fp = NULL;
 	struct stat st;
 
-	if( filesize == 0 ) {
-		if(stat(filename, &st) == -1) {
+	if (filesize == 0) {
+		if (stat(filename, &st) == -1) {
 			return 0;
 		}
+
 		filesize = st.st_size;
 	}
 
@@ -263,19 +267,19 @@ size_t socket_write_file(socket_t sock, const char *filename, size_t filesize)
 #else
 	fp = fopen(filename, "r");
 #endif
-	if( !fp ) {
+	if (!fp) {
 		return 0;
 	}
 
 	buffer = (unsigned char *)xmalloc(blocksize);
 
-	while( (nread = fread(buffer, sizeof(unsigned char), blocksize, fp)) > 0 && ntotal < filesize )
-	{
+	while ((nread = fread(buffer, sizeof(unsigned char), blocksize, fp)) > 0 && ntotal < filesize) {
 		nread = (nread < (filesize - ntotal)) ? nread : (filesize - ntotal);
 		nwrite = socket_write(sock, buffer, nread);
-		if( nwrite != nread ) {
+		if (nwrite != nread) {
 			break;
 		}
+
 		ntotal += nwrite;
 	}
 
@@ -296,15 +300,6 @@ typedef struct HTTPRequest {
 	char *uri;
 } HTTPRequest;
 
-/* Copy to header.
-typedef struct tagHTTPResponse {
-	int status_code;
-	char *header;
-	size_t header_size;
-	unsigned char *data;
-	size_t data_size;
-} HTTPResponse;
-*/
 
 static HTTPRequest *malloc_HTTPRequest(void)
 {
@@ -350,10 +345,12 @@ static void free_HTTPResponse(HTTPResponse *res)
 			free(res->header);
 			res->header = NULL;
 		}
+
 		if (res->data) {
 			free(res->data);
 			res->data = NULL;
 		}
+
 		free(res);
 	}
 }
@@ -371,17 +368,17 @@ static void parse_http_url(HTTPRequest *resreq, const char *url)
 	char *pos = NULL;
 	size_t len = 0;
 
-	if( !strncmp(url, "http://", 7) ) url += 7;
-	if( !strncmp(url, "https://", 8) ) url += 8;
+	if (!strncmp(url, "http://", 7)) url += 7;
+	if (!strncmp(url, "https://", 8)) url += 8;
 
 	pos = strchr(url, '/');
-	if( pos != NULL ) {
+	if (pos != NULL) {
 		len = pos - url;
 		resreq->name = (char *)xmalloc(len + 1);
 		strncpy(resreq->name, url, len);
 		resreq->name[len] = '\0';
 
-		if( *(pos + 1) != '\0' ) {
+		if (*(pos + 1) != '\0') {
 			resreq->uri = xstrdup(pos);
 		} else {
 			resreq->uri = xstrdup("/");
@@ -397,7 +394,7 @@ static void parse_http_url(HTTPRequest *resreq, const char *url)
 #endif
 
 	pos = strchr(resreq->name, ':');
-	if( pos ) {
+	if (pos) {
 		resreq->port = strtol(pos + 1, NULL, 10);
 		*pos = '\0';
 	} else {
@@ -416,13 +413,13 @@ static HTTPResponse *parse_http_result(const char *result, size_t result_size)
 	int size = 0;
 	char *space = NULL;
 
-	if( !result || result_size <= 4 || strncmp(result, "HTTP", 4) != 0 ) {
+	if (!result || result_size <= 4 || strncmp(result, "HTTP", 4) != 0) {
 		return NULL;
 	}
 
 //	Example: HTTP/1.1 200 OK\r\n
 	space = strchr(result, ' ');
-	if( !space ) return NULL;
+	if (!space) return NULL;
 
 	http_response = malloc_HTTPResponse();
 	http_response->status_code = strtol(space + 1, NULL, 10);
@@ -430,10 +427,9 @@ static HTTPResponse *parse_http_result(const char *result, size_t result_size)
 	fprintf(stderr, "status_code: %d\n\n", http_response->status_code);
 #endif
 
-	while( cursor + 4 < result_end )
-	{
-		if( cursor[0] == '\r' && cursor[1] == '\n' &&
-			cursor[2] == '\r' && cursor[3] == '\n' )
+	while (cursor + 4 < result_end) {
+		if (cursor[0] == '\r' && cursor[1] == '\n' &&
+			cursor[2] == '\r' && cursor[3] == '\n')
 		{
 			cursor += 4;
 			data_start = cursor;
@@ -457,7 +453,7 @@ static HTTPResponse *parse_http_result(const char *result, size_t result_size)
 	fprintf(stderr, "start split body... ");
 #endif
 
-	if( data_start ) {
+	if (data_start) {
 		size = result_end - data_start;
 		http_response->data = (unsigned char *)xmalloc(size);
 		memcpy(http_response->data, data_start, size);
@@ -490,7 +486,7 @@ HTTPResponse *socket_http_get(const char *url, const char *query, const char *cu
 	request_size = custom_header ? 0x800 + strlen(custom_header) + 1 : 0x800;
 	request = (char *)xmalloc(request_size);
 
-	if( query ) {
+	if (query) {
 		uri = (char *)xmalloc(strlen(http_request->uri) + strlen(query) + 1);
 		strcpy(uri, http_request->uri);
 		strcat(uri, "?");
@@ -507,22 +503,23 @@ HTTPResponse *socket_http_get(const char *url, const char *query, const char *cu
 	strcat(request, http_request->name);
 	strcat(request, "\r\n");
 	strcat(request, "Accept: */*\r\n");
-	if( !keepalive ) {
+	if (!keepalive) {
 		strcat(request, "Connection: close\r\n");
 	}
-	if( custom_header ) {
+	if (custom_header) {
 		strcat(request, custom_header);
 	}
 	strcat(request, "\r\n"); // End http request header line.
 
 	// Connect.
-	if( (sock = socket_open(AF_INET, SOCK_STREAM, 0)) < 0 ) {
+	if ((sock = socket_open(AF_INET, SOCK_STREAM)) < 0) {
 		return NULL;
 	}
 
-	if( socket_connect(sock, http_request->name, http_request->port) == INVALID_SOCKET ) {
+	if (socket_connect(sock, http_request->name, http_request->port) == INVALID_SOCKET) {
 		return NULL;
 	}
+
 	free_HTTPRequest(http_request);
 
 	socket_write_str(sock, request);
@@ -538,7 +535,7 @@ HTTPResponse *socket_http_get(const char *url, const char *query, const char *cu
 	socket_close(sock);
 
 	// parse response.
-	if( *response ) {
+	if (*response) {
 		http_response = parse_http_result(response, response_size);
 	}
 
@@ -576,24 +573,25 @@ HTTPResponse *socket_http_post(const char *url, const char *content, size_t cont
 	strcat(request, ntos(str_num, content_size));
 	strcat(request, "\r\n");
 	strcat(request, "Content-Type: application/x-www-form-urlencoded\r\n");
-	if( !keepalive ) {
+	if (!keepalive) {
 		strcat(request, "Connection: close\r\n");
 	}
-	if( custom_header ) {
+	if (custom_header) {
 		strcat(request, custom_header);
 	}
 	strcat(request, "\r\n"); // End http request header line.
 
 	// Connect.
-	if( (sock = socket_open(AF_INET, SOCK_STREAM, 0)) < 0) {
+	if ((sock = socket_open(AF_INET, SOCK_STREAM)) < 0) {
 //		fprintf(stderr, "Error, socket_open()\n\n");
 		return NULL;
 	}
 
-	if( socket_connect(sock, http_request->name, http_request->port) == INVALID_SOCKET ) {
+	if (socket_connect(sock, http_request->name, http_request->port) == INVALID_SOCKET) {
 //		fprintf(stderr, "Error, socket_connect()\n\n");
 		return NULL;
 	}
+
 	free_HTTPRequest(http_request);
 
 	socket_write_str(sock, request);
@@ -606,7 +604,7 @@ HTTPResponse *socket_http_post(const char *url, const char *content, size_t cont
 	socket_close(sock);
 
 	// parse response.
-	if( *response ) {
+	if (*response) {
 		http_response = parse_http_result(response, response_size);
 	}
 
@@ -627,8 +625,8 @@ HTTPResponse *socket_http_post_file(const char *url, const char *file_name, size
 	struct stat st;
 	char str_num[16] = "";
 
-	if( file_size == 0 ) {
-		if( stat(file_name, &st) == -1 ) {
+	if (file_size == 0) {
+		if (stat(file_name, &st) == -1) {
 			return NULL;
 		}
 		file_size = st.st_size;
@@ -652,10 +650,10 @@ HTTPResponse *socket_http_post_file(const char *url, const char *file_name, size
 	strcat(request, "Content-Length: ");
 	strcat(request, ntos(str_num, file_size));
 	strcat(request, "\r\n");
-	if( !keepalive ) {
+	if (!keepalive) {
 		strcat(request, "Connection: close\r\n");
 	}
-	if( custom_header ) {
+	if (custom_header) {
 		strcat(request, custom_header);
 	} else {
 		strcat(request, "Content-Type: image/jpeg;\r\n");
@@ -663,13 +661,14 @@ HTTPResponse *socket_http_post_file(const char *url, const char *file_name, size
 	strcat(request, "\r\n"); // End http request header line.
 
 	// Connect.
-	if( (sock = socket_open(AF_INET, SOCK_STREAM, 0)) < 0 ) {
+	if ((sock = socket_open(AF_INET, SOCK_STREAM)) < 0) {
+		return NULL; // Error.
+	}
+
+	if (socket_connect(sock, http_request->name, http_request->port) == INVALID_SOCKET) {
 		return NULL;
 	}
 
-	if( socket_connect(sock, http_request->name, http_request->port) == INVALID_SOCKET ) {
-		return NULL;
-	}
 	free_HTTPRequest(http_request);
 
 	socket_write_str(sock, request);
@@ -682,7 +681,7 @@ HTTPResponse *socket_http_post_file(const char *url, const char *file_name, size
 	socket_close(sock);
 
 	// parse response.
-	if( *response ) {
+	if (*response) {
 		http_response = parse_http_result(response, response_size);
 	}
 
@@ -722,10 +721,10 @@ HTTPResponse *socket_post_data(const char *url, const char *data, size_t data_si
 	strcat(req, "Content-Length: ");
 	strcat(req, ntos(str_num, data_size));
 	strcat(req, "\r\n");
-	if( !keepalive ) {
+	if (!keepalive) {
 		strcat(request, "Connection: close\r\n");
 	}
-	if( custom_header ) {
+	if (custom_header) {
 		strcat(request, custom_header);
 	} else {
 		strcat(request, "Content-Type: image/jpeg;\r\n");
@@ -733,7 +732,7 @@ HTTPResponse *socket_post_data(const char *url, const char *data, size_t data_si
 	strcat(request, "\r\n"); // End http request header line.
 
 	// Connect.
-	sock = socket_open(AF_INET, SOCK_STREAM, 0);
+	sock = socket_open(AF_INET, SOCK_STREAM);
 	socket_connect(sock, http_request->name, http_request->port);
 	free_HTTPRequest(http_request);
 
@@ -747,7 +746,7 @@ HTTPResponse *socket_post_data(const char *url, const char *data, size_t data_si
 	socket_close(sock);
 
 	// parse response.
-	if( *response ) {
+	if (*response) {
 		http_response = parse_http_result(response, response_size);
 	}
 

@@ -29,8 +29,7 @@ void hmac_sha1(const unsigned char *key, size_t keylen, const unsigned char *in,
 	unsigned char block[64];
 	size_t i;
 
-	if( keylen > 64 )
-	{
+	if (keylen > 64) {
 		SHA1Reset(&keyhash);
 		SHA1Input(&keyhash, key, keylen);
 		SHA1Result(&keyhash, tmpkey);
@@ -38,8 +37,7 @@ void hmac_sha1(const unsigned char *key, size_t keylen, const unsigned char *in,
 		keylen = 20;
 	}
 
-	for( i = 0; i < sizeof(block); i++ )
-	{
+	for (i = 0; i < sizeof(block); i++) {
 		block[i] = IPAD ^ (i < keylen ? key[i] : 0);
 	}
 
@@ -48,8 +46,7 @@ void hmac_sha1(const unsigned char *key, size_t keylen, const unsigned char *in,
 	SHA1Input(&inner, in, inlen);
 	SHA1Result(&inner, digest);
 
-	for( i = 0; i < sizeof(block); i++ )
-	{
+	for (i = 0; i < sizeof(block); i++) {
 		block[i] = OPAD ^ (i < keylen ? key[i] : 0);
 	}
 
@@ -85,12 +82,14 @@ char *oauth_body_hash_file(char *filename)
 #else
 	fp = fopen(filename, "r");
 #endif
-	if( !fp ) return NULL;
+	if (!fp) {
+		return NULL;
+	}
 
 	SHA1Reset(&ctx); // init sha1
 
 	// read file
-	while( (len = fread(data, sizeof(unsigned char), sizeof data, fp)) > 0 ) {
+	while ((len = fread(data, sizeof(unsigned char), sizeof data, fp)) > 0) {
 		SHA1Input(&ctx, data, len);
 	}
 

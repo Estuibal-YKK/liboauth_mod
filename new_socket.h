@@ -2,11 +2,16 @@
 #ifndef _MY_SOCKET_H_
 #define _MY_SOCKET_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifdef WIN32
 	#ifndef WIN32_LEAN_AND_MEAN
 		#define WIN32_LEAN_AND_MEAN
 	#endif
 	#include <winsock2.h>
+	#include <ws2tcpip.h>
 #endif
 
 #ifdef WIN32
@@ -34,7 +39,7 @@ typedef struct tagHTTPResponse {
 void socket_init(void);
 void socket_release(void);
 
-socket_t socket_open(int af, int type, int protocol);
+socket_t socket_open(int af, int type);
 int socket_close(socket_t sock);
 int socket_safeclose(socket_t sock);
 socket_t socket_connect(socket_t sock, const char *hostname, int port);
@@ -52,5 +57,9 @@ HTTPResponse *socket_http_get(const char *url, const char *query, const char *cu
 HTTPResponse *socket_http_post(const char *url, const char *content, size_t content_size, const char *custom_header, int keepalive);
 HTTPResponse *socket_http_post_file(const char *url, const char *file_name, size_t file_size, const char *custom_header, int keepalive);
 
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _MY_SOCKET_H_
